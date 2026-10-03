@@ -102,6 +102,9 @@ class UnderpassScene extends Phaser.Scene {
 
   preload() {
     this.load.image('wall-tiles', `${ASSET_BASE}assets/cc0-tiles107-wall.jpg`)
+    this.load.svg('fixture-cctv', `${ASSET_BASE}assets/lucide/cctv.svg`, { width: 96, height: 96 })
+    this.load.svg('fixture-trash', `${ASSET_BASE}assets/lucide/trash.svg`, { width: 48, height: 48 })
+    this.load.svg('fixture-seat', `${ASSET_BASE}assets/lucide/armchair.svg`, { width: 52, height: 52 })
   }
 
   create() {
@@ -128,10 +131,19 @@ class UnderpassScene extends Phaser.Scene {
   createSegment() {
     const container = this.add.container(0, 0)
     const baseGraphics = this.add.graphics()
-    const wallTiles = this.add.tileSprite(0, 92, DESIGN_WIDTH, 426, 'wall-tiles')
+    const wallTiles = this.add.tileSprite(0, 92, DESIGN_WIDTH, 372, 'wall-tiles')
       .setOrigin(0, 0)
       .setAlpha(0.9)
     const graphics = this.add.graphics()
+    const cctv = this.add.image(1192, 58, 'fixture-cctv')
+      .setDisplaySize(62, 62)
+      .setTint(0x293638)
+    const trashSymbol = this.add.image(746, 468, 'fixture-trash')
+      .setDisplaySize(23, 23)
+      .setTint(0xf5f7ec)
+    const seatIcons = [522, 565, 608].map((x) => this.add.image(x, 447, 'fixture-seat')
+      .setDisplaySize(36, 36)
+      .setTint(0x4c3930))
     const directionLabel = this.add.text(676, 110, '地下改札', {
       color: '#182224',
       fontFamily: '"Yu Mincho", serif',
@@ -162,7 +174,19 @@ class UnderpassScene extends Phaser.Scene {
       letterSpacing: 2,
     }).setOrigin(0.5)
 
-    container.add([baseGraphics, wallTiles, graphics, directionLabel, directionNumber, adPrimary, adSecondary, stripeLabel])
+    container.add([
+      baseGraphics,
+      wallTiles,
+      graphics,
+      cctv,
+      trashSymbol,
+      ...seatIcons,
+      directionLabel,
+      directionNumber,
+      adPrimary,
+      adSecondary,
+      stripeLabel,
+    ])
     return { container, baseGraphics, wallTiles, graphics, directionLabel, directionNumber, adPrimary, adSecondary }
   }
 
@@ -183,20 +207,25 @@ class UnderpassScene extends Phaser.Scene {
     baseGraphics.fillStyle(0xf7f7f3, 1)
     baseGraphics.fillRect(0, 0, DESIGN_WIDTH, 92)
     baseGraphics.fillStyle(0xe6e9e5, 1)
-    baseGraphics.fillRect(0, 92, DESIGN_WIDTH, 426)
+    baseGraphics.fillRect(0, 92, DESIGN_WIDTH, 372)
     baseGraphics.fillStyle(0xe8ebe5, 1)
-    baseGraphics.fillRect(0, 518, DESIGN_WIDTH, 202)
+    baseGraphics.fillRect(0, 486, DESIGN_WIDTH, 234)
 
     wallTiles.setTileScale(0.1875, 0.1875)
     wallTiles.setTilePosition(index * 167 + variant * 53, variant * 71)
 
     graphics.clear()
-    graphics.lineStyle(4, 0x293335, 1)
-    graphics.lineBetween(0, 518, DESIGN_WIDTH, 518)
-    drawTileField(graphics, 0, 518, DESIGN_WIDTH, 202, 24, 17)
+    graphics.fillStyle(0xd1d7d1, 1)
+    graphics.fillRect(0, 464, DESIGN_WIDTH, 22)
+    graphics.lineStyle(3, 0x354042, 1)
+    graphics.lineBetween(0, 464, DESIGN_WIDTH, 464)
+    graphics.lineBetween(0, 486, DESIGN_WIDTH, 486)
+    graphics.fillStyle(0x788481, 0.55)
+    graphics.fillRect(0, 471, DESIGN_WIDTH, 5)
+    this.drawFloorTiles(graphics, 0, 486, DESIGN_WIDTH, 234)
 
     graphics.fillStyle(0x273133, 0.08)
-    graphics.fillRect(0, 448, DESIGN_WIDTH, 22)
+    graphics.fillRect(0, 486, DESIGN_WIDTH, 14)
 
     graphics.fillStyle(0xf1d444, 1)
     graphics.fillRect(0, 618, DESIGN_WIDTH, 57)
@@ -210,14 +239,8 @@ class UnderpassScene extends Phaser.Scene {
       }
     }
 
-    graphics.fillStyle(0xd6dad3, 1)
-    graphics.fillRect(0, 470, DESIGN_WIDTH, 17)
-    graphics.lineStyle(3, 0x354042, 1)
-    graphics.lineBetween(0, 470, DESIGN_WIDTH, 470)
-    graphics.lineBetween(0, 487, DESIGN_WIDTH, 487)
-
-    this.drawUtilityDoor(graphics, 34, 127, 116, 321)
-    this.drawElevator(graphics, 980, 135, 162, 313)
+    this.drawUtilityDoor(graphics, 34, 127, 116, 337)
+    this.drawElevator(graphics, 980, 135, 162, 329)
 
     outlinedRect(graphics, 182, 148, 168, 126, adColors[0])
     outlinedRect(graphics, 470, 148, 172, 126, adColors[1])
@@ -234,7 +257,6 @@ class UnderpassScene extends Phaser.Scene {
     this.drawColumn(graphics, 936, 92)
     this.drawBench(graphics, 500, 445)
     this.drawBin(graphics, 723, 441)
-    this.drawCctv(graphics, 1186, 28)
     this.drawLamp(graphics, 245, 34)
     this.drawLamp(graphics, 696, 34)
 
@@ -255,12 +277,32 @@ class UnderpassScene extends Phaser.Scene {
   }
 
   drawColumn(graphics, x, y) {
-    outlinedRect(graphics, x, y, 68, 385, 0xe9ece6)
+    outlinedRect(graphics, x, y, 68, 372, 0xe9ece6)
     graphics.lineStyle(2, 0x9ea7a3, 1)
-    for (let line = y + 34; line < y + 385; line += 34) {
+    for (let line = y + 34; line < y + 370; line += 34) {
       graphics.lineBetween(x + 2, line, x + 66, line)
     }
     outlinedRect(graphics, x - 7, y - 12, 82, 13, 0xcbd1cb)
+    graphics.fillStyle(0x273133, 0.14)
+    graphics.fillRect(x - 6, y + 372, 80, 8)
+    outlinedRect(graphics, x - 6, y + 364, 80, 14, 0xcbd1cb, 0x65706e, 2)
+  }
+
+  drawFloorTiles(graphics, x, y, width, height) {
+    const rowHeight = 17
+    const tileWidth = 24
+    graphics.lineStyle(1.5, 0x9aa39e, 0.78)
+
+    for (let row = y; row <= y + height; row += rowHeight) {
+      graphics.lineBetween(x, row, x + width, row)
+    }
+
+    for (let row = 0; y + row * rowHeight < y + height; row += 1) {
+      const offset = row % 2 === 0 ? 0 : tileWidth / 2
+      for (let column = x - offset; column <= x + width; column += tileWidth) {
+        graphics.lineBetween(column, y + row * rowHeight, column, y + (row + 1) * rowHeight)
+      }
+    }
   }
 
   drawUtilityDoor(graphics, x, y, width, height) {
@@ -320,39 +362,51 @@ class UnderpassScene extends Phaser.Scene {
   }
 
   drawBench(graphics, x, y) {
-    graphics.fillStyle(0xbf8865, 1)
-    graphics.fillRect(x, y, 132, 18)
-    graphics.lineStyle(3, 0x523d2f, 1)
-    graphics.strokeRect(x, y, 132, 18)
-    graphics.lineBetween(x + 13, y + 18, x + 13, y + 42)
-    graphics.lineBetween(x + 119, y + 18, x + 119, y + 42)
+    graphics.fillStyle(0x273133, 0.15)
+    graphics.fillRect(x + 6, y + 26, 132, 12)
+    graphics.fillStyle(0x5f6b68, 1)
+    graphics.fillRect(x + 6, y + 12, 120, 5)
+    graphics.lineStyle(4, 0x45514f, 1)
+    graphics.lineBetween(x + 14, y + 16, x + 14, y + 43)
+    graphics.lineBetween(x + 118, y + 16, x + 118, y + 43)
+    graphics.lineBetween(x + 14, y + 32, x + 118, y + 32)
+    for (let slat = 0; slat < 3; slat += 1) {
+      const slatY = y + slat * 7
+      graphics.fillStyle(0xc68c68, 1)
+      graphics.fillRect(x, slatY, 132, 5)
+      graphics.lineStyle(1, 0x6d4a37, 0.85)
+      graphics.lineBetween(x, slatY + 5, x + 132, slatY + 5)
+    }
   }
 
   drawBin(graphics, x, y) {
-    outlinedRect(graphics, x, y, 46, 57, 0x6c9991)
-    graphics.fillStyle(0xf4f6e8, 1)
-    graphics.fillCircle(x + 23, y + 19, 7)
+    graphics.fillStyle(0x273133, 0.16)
+    graphics.fillRoundedRect(x + 4, y + 5, 46, 57, 5)
+    graphics.fillStyle(0x5c8982, 1)
+    graphics.fillRoundedRect(x, y, 46, 57, 5)
+    graphics.lineStyle(3, 0x314a47, 1)
+    graphics.strokeRoundedRect(x, y, 46, 57, 5)
+    graphics.fillStyle(0x2f4845, 1)
+    graphics.fillRoundedRect(x - 3, y - 4, 52, 9, 3)
+    graphics.fillStyle(0xcad8cf, 1)
+    graphics.fillCircle(x + 8, y + 61, 3)
+    graphics.fillCircle(x + 38, y + 61, 3)
   }
 
   drawLamp(graphics, x, y) {
-    graphics.fillStyle(0xffffff, 1)
+    graphics.fillStyle(0xffffff, 0.28)
+    graphics.fillRoundedRect(x - 6, y - 6, 168, 26, 5)
+    graphics.fillStyle(0xeff2ed, 1)
     graphics.fillRoundedRect(x, y, 156, 14, 3)
     graphics.lineStyle(3, 0x414c4e, 1)
     graphics.strokeRoundedRect(x, y, 156, 14, 3)
+    graphics.fillStyle(0xfcfce7, 1)
+    graphics.fillRoundedRect(x + 10, y + 4, 136, 6, 2)
+    graphics.lineStyle(2, 0x687472, 1)
+    graphics.lineBetween(x + 18, y, x + 18, y - 12)
+    graphics.lineBetween(x + 138, y, x + 138, y - 12)
     graphics.lineStyle(1, 0xd8ded8, 1)
     graphics.lineBetween(x + 12, y + 7, x + 144, y + 7)
-  }
-
-  drawCctv(graphics, x, y) {
-    graphics.lineStyle(4, 0x303b3d, 1)
-    graphics.lineBetween(x + 26, y, x + 26, y + 26)
-    graphics.lineBetween(x + 26, y + 26, x + 3, y + 39)
-    graphics.fillStyle(0xd7ddda, 1)
-    graphics.fillRoundedRect(x, y + 33, 36, 18, 5)
-    graphics.lineStyle(3, 0x303b3d, 1)
-    graphics.strokeRoundedRect(x, y + 33, 36, 18, 5)
-    graphics.fillStyle(0x283234, 1)
-    graphics.fillCircle(x + 8, y + 42, 4)
   }
 
   drawPosterMotif(graphics, x, y, width, height, variant, kind) {
