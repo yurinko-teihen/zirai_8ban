@@ -3,19 +3,14 @@ import './phaser.css'
 
 const DESIGN_WIDTH = 1280
 const DESIGN_HEIGHT = 720
-const WORLD_SCREENS = 9
+const WORLD_SCREENS = 5
 const WORLD_WIDTH = DESIGN_WIDTH * WORLD_SCREENS
 const CAMERA_LOCK = 576
 const START_POSITION = Math.floor(WORLD_SCREENS / 2) * DESIGN_WIDTH + CAMERA_LOCK
 const WALK_SPEED = 440
 const LEFT_GATE_POSITION = 150
 const RIGHT_GATE_POSITION = WORLD_WIDTH - LEFT_GATE_POSITION
-const VIDEO_CROP = { x: 350, y: 30, width: 450, height: 650 }
 const ASSET_BASE = import.meta.env.BASE_URL
-const FOREGROUND_ALPHA_THRESHOLD = 180
-const ALIGNMENT_SAMPLE_TOP = 36
-const ALIGNMENT_SAMPLE_BOTTOM = 156
-const MAX_FOOTAGE_SHIFT = 24
 
 const app = document.querySelector('#app')
 
@@ -23,8 +18,8 @@ app.innerHTML = `
   <main class="game-shell">
     <div id="phaser-game" class="game-canvas" aria-label="地雷ちゃんの地下鉄通路"></div>
     <div id="player-layer" class="player-layer" data-facing="right">
-      <canvas id="player-canvas" width="120" height="180" aria-label="歩く地雷ちゃん"></canvas>
-      <video id="player-video" src="${ASSET_BASE}VID_20261003_234946.mp4" muted loop playsinline preload="auto" aria-hidden="true"></video>
+      <div class="player-shadow" aria-hidden="true"></div>
+      <div id="player-sprite" class="player-sprite" role="img" aria-label="歩く地雷ちゃん" style="--walk-sprite: url('${ASSET_BASE}assets/zirai-walk-sprite.png')"></div>
     </div>
     <div class="screen-tools">
       <button id="reset-button" class="screen-button" type="button" title="出発地点へ戻る" aria-label="出発地点へ戻る">↺</button>
@@ -41,9 +36,6 @@ app.innerHTML = `
 `
 
 const playerLayer = document.querySelector('#player-layer')
-const playerCanvas = document.querySelector('#player-canvas')
-const playerVideo = document.querySelector('#player-video')
-const playerContext = playerCanvas.getContext('2d', { willReadFrequently: true })
 const distanceCount = document.querySelector('#distance-count')
 const zoneReadout = document.querySelector('#zone-readout')
 const statusMessage = document.querySelector('#status-message')
@@ -54,9 +46,6 @@ const fadeOverlay = document.querySelector('#fade-overlay')
 const controls = new Set()
 let isPlayerWalking = false
 let activeScene
-let videoFrameCallbackId = null
-let animationFrameId = null
-let playerAnchorCenter = null
 
 function currentDirection() {
   const movingLeft = controls.has('left')
@@ -69,105 +58,6 @@ function currentDirection() {
   return movingLeft ? -1 : 1
 }
 
-function drawWalkFrame() {
-  if (playerVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-    return
-  }
-
-  playerContext.drawImage(
-    playerVideo,
-    VIDEO_CROP.x,
-    VIDEO_CROP.y,
-    VIDEO_CROP.width,
-    VIDEO_CROP.height,
-    0,
-    0,
-    playerCanvas.width,
-    playerCanvas.height,
-  )
-
-  const imageData = playerContext.getImageData(0, 0, playerCanvas.width, playerCanvas.height)
-  const { data } = imageData
-  let foregroundLeft = playerCanvas.width
-  let foregroundRight = -1
-
-  for (let y = 0; y < playerCanvas.height; y += 1) {
-    for (let x = 0; x < playerCanvas.width; x += 1) {
-      const pixel = (y * playerCanvas.width + x) * 4
-      const red = data[pixel]
-      const green = data[pixel + 1]
-      const blue = data[pixel + 2]
-      const greenDominance = green - Math.max(red, blue)
-
-      if (green > 70 && greenDominance > 28) {
-        data[pixel + 1] = Math.min(green, Math.max(red, blue) + 18)
-        data[pixel + 3] = Math.max(0, 255 - (greenDominance - 28) * 5)
-      }
-
-      if (
-        y >= ALIGNMENT_SAMPLE_TOP
-        && y < ALIGNMENT_SAMPLE_BOTTOM
-        && data[pixel + 3] >= FOREGROUND_ALPHA_THRESHOLD
-      ) {
-        foregroundLeft = Math.min(foregroundLeft, x)
-        foregroundRight = Math.max(foregroundRight, x)
-      }
-    }
-  }
-
-  playerContext.putImageData(imageData, 0, 0)
-  alignWalkFrame(foregroundLeft, foregroundRight)
-}
-
-function alignWalkFrame(foregroundLeft, foregroundRight) {
-  if (foregroundRight < foregroundLeft) {
-    return
-  }
-
-  const foregroundCenter = (foregroundLeft + foregroundRight) / 2
-  playerAnchorCenter ??= foregroundCenter
-  const facingMultiplier = playerLayer.dataset.facing === 'left' ? -1 : 1
-  const footageShift = Phaser.Math.Clamp(
-    (playerAnchorCenter - foregroundCenter) * facingMultiplier,
-    -MAX_FOOTAGE_SHIFT,
-    MAX_FOOTAGE_SHIFT,
-  )
-  playerCanvas.style.setProperty('--footage-shift', `${footageShift}px`)
-}
-
-function requestWalkFrame() {
-  if (playerVideo.paused) {
-    return
-  }
-
-  if (typeof playerVideo.requestVideoFrameCallback === 'function') {
-    videoFrameCallbackId = playerVideo.requestVideoFrameCallback(() => {
-      videoFrameCallbackId = null
-      drawWalkFrame()
-      requestWalkFrame()
-    })
-    return
-  }
-
-  animationFrameId = window.requestAnimationFrame(() => {
-    animationFrameId = null
-    drawWalkFrame()
-    requestWalkFrame()
-  })
-}
-
-function stopWalkFrameUpdates() {
-  if (videoFrameCallbackId !== null) {
-    playerVideo.cancelVideoFrameCallback?.(videoFrameCallbackId)
-    videoFrameCallbackId = null
-  }
-
-  if (animationFrameId !== null) {
-    window.cancelAnimationFrame(animationFrameId)
-    animationFrameId = null
-  }
-}
-
 function setPlayerWalking(isWalking, facing) {
   playerLayer.dataset.facing = facing
 
@@ -177,19 +67,6 @@ function setPlayerWalking(isWalking, facing) {
 
   isPlayerWalking = isWalking
   playerLayer.classList.toggle('is-walking', isWalking)
-
-  if (isWalking) {
-    playerVideo.play().then(() => {
-      drawWalkFrame()
-      requestWalkFrame()
-    }).catch(() => {})
-    return
-  }
-
-  stopWalkFrameUpdates()
-  playerVideo.pause()
-  playerVideo.currentTime = 0
-  drawWalkFrame()
 }
 
 function outlinedRect(graphics, x, y, width, height, fillColor, lineColor = 0x283235, lineWidth = 3) {
@@ -297,13 +174,13 @@ class UnderpassScene extends Phaser.Scene {
     graphics.fillRect(0, 0, DESIGN_WIDTH, 92)
     graphics.fillStyle(0xe9ece7, 1)
     graphics.fillRect(0, 92, DESIGN_WIDTH, 426)
-    drawTileField(graphics, 0, 92, DESIGN_WIDTH, 426, 48, 38)
+    drawTileField(graphics, 0, 92, DESIGN_WIDTH, 426, 24, 19)
     graphics.lineStyle(4, 0x293335, 1)
     graphics.lineBetween(0, 518, DESIGN_WIDTH, 518)
 
     graphics.fillStyle(0xe8ebe5, 1)
     graphics.fillRect(0, 518, DESIGN_WIDTH, 202)
-    drawTileField(graphics, 0, 518, DESIGN_WIDTH, 202, 48, 34)
+    drawTileField(graphics, 0, 518, DESIGN_WIDTH, 202, 24, 17)
 
     graphics.fillStyle(0xf1d444, 1)
     graphics.fillRect(0, 618, DESIGN_WIDTH, 57)
@@ -629,7 +506,3 @@ moveButtons.forEach((button) => {
   button.addEventListener('pointercancel', releaseDirection)
   button.addEventListener('lostpointercapture', releaseDirection)
 })
-
-playerVideo.addEventListener('loadeddata', drawWalkFrame)
-playerVideo.addEventListener('canplay', drawWalkFrame)
-game.events.once(Phaser.Core.Events.READY, () => drawWalkFrame())
