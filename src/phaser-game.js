@@ -10,6 +10,7 @@ const START_POSITION = Math.floor(WORLD_SCREENS / 2) * DESIGN_WIDTH + CAMERA_LOC
 const WALK_SPEED = 440
 const LEFT_GATE_POSITION = 150
 const RIGHT_GATE_POSITION = WORLD_WIDTH - LEFT_GATE_POSITION
+const ASSET_BASE = import.meta.env.BASE_URL
 
 const app = document.querySelector('#app')
 
@@ -99,6 +100,10 @@ class UnderpassScene extends Phaser.Scene {
     this.awaitingInputRelease = false
   }
 
+  preload() {
+    this.load.image('wall-tiles', `${ASSET_BASE}assets/cc0-tiles107-wall.jpg`)
+  }
+
   create() {
     this.cameras.main.setBackgroundColor('#edf0ec')
     this.cameras.main.roundPixels = true
@@ -122,6 +127,10 @@ class UnderpassScene extends Phaser.Scene {
 
   createSegment() {
     const container = this.add.container(0, 0)
+    const baseGraphics = this.add.graphics()
+    const wallTiles = this.add.tileSprite(0, 92, DESIGN_WIDTH, 426, 'wall-tiles')
+      .setOrigin(0, 0)
+      .setAlpha(0.9)
     const graphics = this.add.graphics()
     const directionLabel = this.add.text(676, 110, '地下改札', {
       color: '#182224',
@@ -153,12 +162,12 @@ class UnderpassScene extends Phaser.Scene {
       letterSpacing: 2,
     }).setOrigin(0.5)
 
-    container.add([graphics, directionLabel, directionNumber, adPrimary, adSecondary, stripeLabel])
-    return { container, graphics, directionLabel, directionNumber, adPrimary, adSecondary }
+    container.add([baseGraphics, wallTiles, graphics, directionLabel, directionNumber, adPrimary, adSecondary, stripeLabel])
+    return { container, baseGraphics, wallTiles, graphics, directionLabel, directionNumber, adPrimary, adSecondary }
   }
 
   drawSegment(segment, index) {
-    const { graphics, directionLabel, directionNumber, adPrimary, adSecondary } = segment
+    const { baseGraphics, wallTiles, graphics, directionLabel, directionNumber, adPrimary, adSecondary } = segment
     const zone = String(((index % 100) + 100) % 100).padStart(2, '0')
     const variant = ((index + this.routeNumber) % 3 + 3) % 3
     const adColors = [
@@ -167,21 +176,27 @@ class UnderpassScene extends Phaser.Scene {
       [0x87657c, 0xb9dfd0],
     ][variant]
 
-    graphics.clear()
-    graphics.fillStyle(0xf0f1ed, 1)
-    graphics.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT)
+    baseGraphics.clear()
+    baseGraphics.fillStyle(0xf0f1ed, 1)
+    baseGraphics.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT)
 
-    graphics.fillStyle(0xf7f7f3, 1)
-    graphics.fillRect(0, 0, DESIGN_WIDTH, 92)
-    graphics.fillStyle(0xe9ece7, 1)
-    graphics.fillRect(0, 92, DESIGN_WIDTH, 426)
-    drawTileField(graphics, 0, 92, DESIGN_WIDTH, 426, 24, 19)
+    baseGraphics.fillStyle(0xf7f7f3, 1)
+    baseGraphics.fillRect(0, 0, DESIGN_WIDTH, 92)
+    baseGraphics.fillStyle(0xe6e9e5, 1)
+    baseGraphics.fillRect(0, 92, DESIGN_WIDTH, 426)
+    baseGraphics.fillStyle(0xe8ebe5, 1)
+    baseGraphics.fillRect(0, 518, DESIGN_WIDTH, 202)
+
+    wallTiles.setTileScale(0.1875, 0.1875)
+    wallTiles.setTilePosition(index * 167 + variant * 53, variant * 71)
+
+    graphics.clear()
     graphics.lineStyle(4, 0x293335, 1)
     graphics.lineBetween(0, 518, DESIGN_WIDTH, 518)
-
-    graphics.fillStyle(0xe8ebe5, 1)
-    graphics.fillRect(0, 518, DESIGN_WIDTH, 202)
     drawTileField(graphics, 0, 518, DESIGN_WIDTH, 202, 24, 17)
+
+    graphics.fillStyle(0x273133, 0.08)
+    graphics.fillRect(0, 448, DESIGN_WIDTH, 22)
 
     graphics.fillStyle(0xf1d444, 1)
     graphics.fillRect(0, 618, DESIGN_WIDTH, 57)
@@ -201,14 +216,8 @@ class UnderpassScene extends Phaser.Scene {
     graphics.lineBetween(0, 470, DESIGN_WIDTH, 470)
     graphics.lineBetween(0, 487, DESIGN_WIDTH, 487)
 
-    outlinedRect(graphics, 36, 128, 112, 320, 0xd8ddd8)
-    graphics.lineStyle(3, 0x65706e, 1)
-    graphics.lineBetween(92, 132, 92, 445)
-    graphics.lineBetween(43, 255, 141, 255)
-    outlinedRect(graphics, 1046, 142, 116, 306, 0xd8ddd8)
-    graphics.lineStyle(3, 0x65706e, 1)
-    graphics.lineBetween(1104, 146, 1104, 445)
-    graphics.lineBetween(1053, 255, 1155, 255)
+    this.drawUtilityDoor(graphics, 34, 127, 116, 321)
+    this.drawElevator(graphics, 980, 135, 162, 313)
 
     outlinedRect(graphics, 182, 148, 168, 126, adColors[0])
     outlinedRect(graphics, 470, 148, 172, 126, adColors[1])
@@ -219,9 +228,7 @@ class UnderpassScene extends Phaser.Scene {
     graphics.lineBetween(700, 126, 920, 126)
     graphics.lineBetween(893, 98, 893, 147)
 
-    outlinedRect(graphics, 1070, 320, 84, 66, 0xf4d743)
-    graphics.fillStyle(0x283235, 1)
-    graphics.fillRect(1082, 338, 60, 3)
+    this.drawEmergencyPanel(graphics, 850, 330)
 
     this.drawColumn(graphics, 370, 92)
     this.drawColumn(graphics, 936, 92)
@@ -254,6 +261,62 @@ class UnderpassScene extends Phaser.Scene {
       graphics.lineBetween(x + 2, line, x + 66, line)
     }
     outlinedRect(graphics, x - 7, y - 12, 82, 13, 0xcbd1cb)
+  }
+
+  drawUtilityDoor(graphics, x, y, width, height) {
+    graphics.fillStyle(0x273133, 0.14)
+    graphics.fillRect(x + 8, y + 8, width, height)
+    outlinedRect(graphics, x, y, width, height, 0xd8ddd6, 0x465152, 4)
+    graphics.fillStyle(0xd0d5d0, 1)
+    graphics.fillRect(x + 10, y + 12, width - 20, height - 24)
+    graphics.lineStyle(2, 0x8b9692, 0.9)
+    for (let line = y + 44; line < y + height - 12; line += 34) {
+      graphics.lineBetween(x + 12, line, x + width - 12, line)
+    }
+    graphics.lineStyle(3, 0x5c6767, 1)
+    graphics.lineBetween(x + width / 2, y + 14, x + width / 2, y + height - 14)
+    graphics.fillStyle(0x354142, 1)
+    graphics.fillRoundedRect(x + width - 27, y + height / 2 - 7, 13, 24, 3)
+    graphics.fillStyle(0xb7c0bb, 1)
+    graphics.fillRect(x + width - 24, y + height / 2 - 4, 7, 2)
+  }
+
+  drawElevator(graphics, x, y, width, height) {
+    graphics.fillStyle(0x273133, 0.18)
+    graphics.fillRect(x + 10, y + 10, width, height)
+    outlinedRect(graphics, x, y, width, height, 0xd7dcd7, 0x344042, 4)
+    graphics.fillStyle(0x495557, 1)
+    graphics.fillRect(x + 12, y + 20, width - 24, height - 32)
+    graphics.fillGradientStyle(0xe8ece8, 0xbcc5c2, 0xc9d1ce, 0xf1f3ef, 1)
+    graphics.fillRect(x + 17, y + 25, (width - 38) / 2, height - 42)
+    graphics.fillGradientStyle(0xc9d1ce, 0xe9eeea, 0xf1f3ef, 0xc7cfcc, 1)
+    graphics.fillRect(x + width / 2 + 2, y + 25, (width - 38) / 2, height - 42)
+    graphics.lineStyle(2, 0x707b79, 1)
+    graphics.lineBetween(x + width / 2, y + 25, x + width / 2, y + height - 17)
+    graphics.lineBetween(x + 18, y + height - 26, x + width - 18, y + height - 26)
+    graphics.fillStyle(0x1e282a, 1)
+    graphics.fillRoundedRect(x + width / 2 - 19, y + 5, 38, 15, 2)
+    graphics.fillStyle(0xe6d347, 1)
+    graphics.fillRect(x + width / 2 - 7, y + 10, 14, 3)
+    graphics.fillStyle(0x354142, 1)
+    graphics.fillRoundedRect(x - 23, y + height / 2 - 24, 16, 48, 3)
+    graphics.fillStyle(0xf1d444, 1)
+    graphics.fillCircle(x - 15, y + height / 2 - 9, 4)
+    graphics.fillCircle(x - 15, y + height / 2 + 9, 4)
+  }
+
+  drawEmergencyPanel(graphics, x, y) {
+    graphics.fillStyle(0x273133, 0.15)
+    graphics.fillRect(x + 5, y + 5, 68, 75)
+    outlinedRect(graphics, x, y, 68, 75, 0xf0d64a)
+    graphics.fillStyle(0x263133, 1)
+    graphics.fillRect(x + 13, y + 16, 42, 4)
+    graphics.fillStyle(0xf7f7f2, 1)
+    graphics.fillCircle(x + 34, y + 42, 11)
+    graphics.lineStyle(3, 0x263133, 1)
+    graphics.strokeCircle(x + 34, y + 42, 11)
+    graphics.fillStyle(0x263133, 1)
+    graphics.fillRect(x + 21, y + 61, 26, 3)
   }
 
   drawBench(graphics, x, y) {
