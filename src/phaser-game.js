@@ -23,31 +23,31 @@ app.innerHTML = `
         <div class="player-sprite-frames" aria-hidden="true"></div>
       </div>
     </div>
+    <div id="tap-controls" class="tap-controls" aria-hidden="true"></div>
     <div class="screen-tools">
       <button id="reset-button" class="screen-button" type="button" title="出発地点へ戻る" aria-label="出発地点へ戻る">↺</button>
       <div class="distance-chip" aria-live="polite"><small>EXIT</small><strong id="distance-count">0</strong></div>
     </div>
     <div class="zone-sign"><span>地下連絡通路</span><b id="zone-readout">00</b></div>
-    <div class="movement-controls" aria-label="移動コントロール">
-      <button class="move-button" type="button" data-direction="left" title="左へ移動" aria-label="左へ移動">←</button>
-      <button class="move-button" type="button" data-direction="right" title="右へ移動" aria-label="右へ移動">→</button>
-    </div>
     <div id="fade-overlay" class="fade-overlay" aria-hidden="true"></div>
     <p id="status-message" class="screen-reader-message" aria-live="polite">地下道は、どこまでも続いている。</p>
   </main>
 `
 
+const gameShell = document.querySelector('.game-shell')
 const playerLayer = document.querySelector('#player-layer')
+const tapControls = document.querySelector('#tap-controls')
 const distanceCount = document.querySelector('#distance-count')
 const zoneReadout = document.querySelector('#zone-readout')
 const statusMessage = document.querySelector('#status-message')
 const resetButton = document.querySelector('#reset-button')
-const moveButtons = [...document.querySelectorAll('[data-direction]')]
 const fadeOverlay = document.querySelector('#fade-overlay')
 
 const controls = new Set()
 let isPlayerWalking = false
 let activeScene
+let activeTapPointerId = null
+let activeTapDirection = null
 
 function currentDirection() {
   const movingLeft = controls.has('left')
@@ -69,6 +69,49 @@ function setPlayerWalking(isWalking, facing) {
 
   isPlayerWalking = isWalking
   playerLayer.classList.toggle('is-walking', isWalking)
+}
+
+function requestMobileFullscreen() {
+  if (!window.matchMedia('(pointer: coarse)').matches || document.fullscreenElement) {
+    return
+  }
+
+  const requestFullscreen = gameShell.requestFullscreen?.bind(gameShell)
+    ?? gameShell.webkitRequestFullscreen?.bind(gameShell)
+
+  if (!requestFullscreen) {
+    return
+  }
+
+  Promise.resolve(requestFullscreen())
+    .then(() => screen.orientation?.lock?.('landscape'))
+    .catch(() => {})
+}
+
+function beginTapMovement(event) {
+  if (activeTapPointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) {
+    return
+  }
+
+  event.preventDefault()
+  activeTapPointerId = event.pointerId
+  activeTapDirection = event.clientX < gameShell.getBoundingClientRect().left + gameShell.clientWidth / 2
+    ? 'left'
+    : 'right'
+  controls.add(activeTapDirection)
+  tapControls.setPointerCapture(event.pointerId)
+  requestMobileFullscreen()
+}
+
+function endTapMovement(event) {
+  if (event.pointerId !== activeTapPointerId) {
+    return
+  }
+
+  controls.delete(activeTapDirection)
+  activeTapPointerId = null
+  activeTapDirection = null
+  activeScene?.releaseMovement()
 }
 
 function outlinedRect(graphics, x, y, width, height, fillColor, lineColor = 0x283235, lineWidth = 3) {
@@ -102,9 +145,10 @@ class UnderpassScene extends Phaser.Scene {
 
   preload() {
     this.load.image('wall-tiles', `${ASSET_BASE}assets/cc0-tiles107-wall.jpg`)
-    this.load.svg('fixture-cctv', `${ASSET_BASE}assets/lucide/cctv.svg`, { width: 96, height: 96 })
-    this.load.svg('fixture-trash', `${ASSET_BASE}assets/lucide/trash.svg`, { width: 48, height: 48 })
-    this.load.svg('fixture-seat', `${ASSET_BASE}assets/lucide/armchair.svg`, { width: 52, height: 52 })
+    this.load.spritesheet('industrial-tiles', `${ASSET_BASE}assets/cc0-industrial-tiles.png`, {
+      frameWidth: 64,
+      frameHeight: 64,
+    })
   }
 
   create() {
@@ -131,19 +175,16 @@ class UnderpassScene extends Phaser.Scene {
   createSegment() {
     const container = this.add.container(0, 0)
     const baseGraphics = this.add.graphics()
-    const wallTiles = this.add.tileSprite(0, 92, DESIGN_WIDTH, 372, 'wall-tiles')
+    const wallTiles = this.add.tileSprite(0, 104, DESIGN_WIDTH, 360, 'wall-tiles')
       .setOrigin(0, 0)
-      .setAlpha(0.9)
+      .setAlpha(1)
     const graphics = this.add.graphics()
-    const cctv = this.add.image(1192, 58, 'fixture-cctv')
-      .setDisplaySize(62, 62)
-      .setTint(0x293638)
-    const trashSymbol = this.add.image(746, 468, 'fixture-trash')
-      .setDisplaySize(23, 23)
-      .setTint(0xf5f7ec)
-    const seatIcons = [522, 565, 608].map((x) => this.add.image(x, 447, 'fixture-seat')
-      .setDisplaySize(36, 36)
-      .setTint(0x4c3930))
+    const utilityVent = this.add.image(170, 371, 'industrial-tiles', 104)
+      .setDisplaySize(38, 38)
+      .setTint(0xaebdb5)
+    const elevatorVent = this.add.image(942, 372, 'industrial-tiles', 104)
+      .setDisplaySize(34, 34)
+      .setTint(0xaebdb5)
     const directionLabel = this.add.text(676, 110, '地下改札', {
       color: '#182224',
       fontFamily: '"Yu Mincho", serif',
@@ -178,9 +219,8 @@ class UnderpassScene extends Phaser.Scene {
       baseGraphics,
       wallTiles,
       graphics,
-      cctv,
-      trashSymbol,
-      ...seatIcons,
+      utilityVent,
+      elevatorVent,
       directionLabel,
       directionNumber,
       adPrimary,
@@ -204,10 +244,12 @@ class UnderpassScene extends Phaser.Scene {
     baseGraphics.fillStyle(0xf0f1ed, 1)
     baseGraphics.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT)
 
-    baseGraphics.fillStyle(0xf7f7f3, 1)
-    baseGraphics.fillRect(0, 0, DESIGN_WIDTH, 92)
+    baseGraphics.fillStyle(0xe4e8e1, 1)
+    baseGraphics.fillRect(0, 0, DESIGN_WIDTH, 86)
+    baseGraphics.fillStyle(0xc4ccc5, 1)
+    baseGraphics.fillRect(0, 86, DESIGN_WIDTH, 18)
     baseGraphics.fillStyle(0xe6e9e5, 1)
-    baseGraphics.fillRect(0, 92, DESIGN_WIDTH, 372)
+    baseGraphics.fillRect(0, 104, DESIGN_WIDTH, 360)
     baseGraphics.fillStyle(0xe8ebe5, 1)
     baseGraphics.fillRect(0, 486, DESIGN_WIDTH, 234)
 
@@ -215,6 +257,7 @@ class UnderpassScene extends Phaser.Scene {
     wallTiles.setTilePosition(index * 167 + variant * 53, variant * 71)
 
     graphics.clear()
+    this.drawCeiling(graphics)
     graphics.fillStyle(0xd1d7d1, 1)
     graphics.fillRect(0, 464, DESIGN_WIDTH, 22)
     graphics.lineStyle(3, 0x354042, 1)
@@ -252,6 +295,7 @@ class UnderpassScene extends Phaser.Scene {
     graphics.lineBetween(893, 98, 893, 147)
 
     this.drawEmergencyPanel(graphics, 850, 330)
+    this.drawCctv(graphics, 1110, 116)
 
     this.drawColumn(graphics, 370, 92)
     this.drawColumn(graphics, 936, 92)
@@ -303,6 +347,24 @@ class UnderpassScene extends Phaser.Scene {
         graphics.lineBetween(column, y + row * rowHeight, column, y + (row + 1) * rowHeight)
       }
     }
+  }
+
+  drawCeiling(graphics) {
+    graphics.lineStyle(2, 0xaab3ad, 0.85)
+    for (let x = 0; x <= DESIGN_WIDTH; x += 160) {
+      graphics.lineBetween(x, 0, x, 86)
+    }
+    graphics.lineBetween(0, 43, DESIGN_WIDTH, 43)
+
+    graphics.fillStyle(0x75817d, 0.75)
+    graphics.fillRect(0, 86, DESIGN_WIDTH, 5)
+    graphics.fillStyle(0xd9ded8, 1)
+    graphics.fillRect(0, 91, DESIGN_WIDTH, 13)
+    graphics.lineStyle(3, 0x374344, 1)
+    graphics.lineBetween(0, 86, DESIGN_WIDTH, 86)
+    graphics.lineBetween(0, 104, DESIGN_WIDTH, 104)
+    graphics.lineStyle(1, 0x87918c, 1)
+    graphics.lineBetween(0, 96, DESIGN_WIDTH, 96)
   }
 
   drawUtilityDoor(graphics, x, y, width, height) {
@@ -361,33 +423,52 @@ class UnderpassScene extends Phaser.Scene {
     graphics.fillRect(x + 21, y + 61, 26, 3)
   }
 
+  drawCctv(graphics, x, y) {
+    graphics.lineStyle(4, 0x344042, 1)
+    graphics.lineBetween(x, y, x, y + 25)
+    graphics.lineBetween(x, y + 24, x + 18, y + 24)
+    graphics.fillStyle(0x75817d, 1)
+    graphics.fillCircle(x, y, 6)
+    outlinedRect(graphics, x + 16, y + 12, 58, 26, 0xbfc8c1, 0x344042, 3)
+    graphics.fillStyle(0xeff3eb, 1)
+    graphics.fillRect(x + 27, y + 17, 33, 10)
+    graphics.fillStyle(0x263133, 1)
+    graphics.fillCircle(x + 24, y + 25, 8)
+    graphics.fillStyle(0xf1d444, 1)
+    graphics.fillCircle(x + 67, y + 31, 3)
+  }
+
   drawBench(graphics, x, y) {
     graphics.fillStyle(0x273133, 0.15)
-    graphics.fillRect(x + 6, y + 26, 132, 12)
-    graphics.fillStyle(0x5f6b68, 1)
-    graphics.fillRect(x + 6, y + 12, 120, 5)
-    graphics.lineStyle(4, 0x45514f, 1)
-    graphics.lineBetween(x + 14, y + 16, x + 14, y + 43)
-    graphics.lineBetween(x + 118, y + 16, x + 118, y + 43)
-    graphics.lineBetween(x + 14, y + 32, x + 118, y + 32)
+    graphics.fillRect(x + 6, y + 34, 132, 10)
+    graphics.fillStyle(0x64716e, 1)
+    graphics.fillRect(x + 6, y + 30, 120, 5)
+    graphics.lineStyle(4, 0x344042, 1)
+    graphics.lineBetween(x + 14, y + 16, x + 14, y + 46)
+    graphics.lineBetween(x + 118, y + 16, x + 118, y + 46)
+    graphics.lineBetween(x + 14, y + 38, x + 118, y + 38)
     for (let slat = 0; slat < 3; slat += 1) {
-      const slatY = y + slat * 7
-      graphics.fillStyle(0xc68c68, 1)
-      graphics.fillRect(x, slatY, 132, 5)
-      graphics.lineStyle(1, 0x6d4a37, 0.85)
-      graphics.lineBetween(x, slatY + 5, x + 132, slatY + 5)
+      const slatY = y + slat * 9
+      graphics.fillStyle(0xaeb8b2, 1)
+      graphics.fillRect(x, slatY, 132, 7)
+      graphics.lineStyle(1, 0x64716e, 1)
+      graphics.lineBetween(x, slatY + 7, x + 132, slatY + 7)
     }
   }
 
   drawBin(graphics, x, y) {
     graphics.fillStyle(0x273133, 0.16)
     graphics.fillRoundedRect(x + 4, y + 5, 46, 57, 5)
-    graphics.fillStyle(0x5c8982, 1)
+    graphics.fillStyle(0x7b8983, 1)
     graphics.fillRoundedRect(x, y, 46, 57, 5)
-    graphics.lineStyle(3, 0x314a47, 1)
+    graphics.lineStyle(3, 0x344042, 1)
     graphics.strokeRoundedRect(x, y, 46, 57, 5)
-    graphics.fillStyle(0x2f4845, 1)
+    graphics.fillStyle(0x344042, 1)
     graphics.fillRoundedRect(x - 3, y - 4, 52, 9, 3)
+    graphics.fillStyle(0xd7ded8, 1)
+    graphics.fillRoundedRect(x + 11, y + 16, 24, 8, 2)
+    graphics.fillStyle(0x344042, 1)
+    graphics.fillRect(x + 16, y + 19, 14, 2)
     graphics.fillStyle(0xcad8cf, 1)
     graphics.fillCircle(x + 8, y + 61, 3)
     graphics.fillCircle(x + 38, y + 61, 3)
@@ -604,23 +685,14 @@ document.addEventListener('keyup', (event) => {
   }
 })
 
-window.addEventListener('blur', () => controls.clear())
+window.addEventListener('blur', () => {
+  controls.clear()
+  activeTapPointerId = null
+  activeTapDirection = null
+})
 resetButton.addEventListener('click', () => activeScene?.resetPosition())
 
-moveButtons.forEach((button) => {
-  const { direction } = button.dataset
-
-  button.addEventListener('pointerdown', (event) => {
-    event.preventDefault()
-    button.setPointerCapture(event.pointerId)
-    controls.add(direction)
-  })
-
-  const releaseDirection = () => controls.delete(direction)
-  button.addEventListener('pointerup', () => activeScene?.releaseMovement())
-  button.addEventListener('pointercancel', () => activeScene?.releaseMovement())
-  button.addEventListener('lostpointercapture', () => activeScene?.releaseMovement())
-  button.addEventListener('pointerup', releaseDirection)
-  button.addEventListener('pointercancel', releaseDirection)
-  button.addEventListener('lostpointercapture', releaseDirection)
-})
+tapControls.addEventListener('pointerdown', beginTapMovement)
+tapControls.addEventListener('pointerup', endTapMovement)
+tapControls.addEventListener('pointercancel', endTapMovement)
+tapControls.addEventListener('lostpointercapture', endTapMovement)

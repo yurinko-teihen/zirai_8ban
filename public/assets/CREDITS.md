@@ -4,6 +4,6 @@
   Source: https://ambientcg.com/view?id=Tiles107
   License: CC0 1.0 Universal.
 
-- `lucide/cctv.svg`, `lucide/trash.svg`, and `lucide/armchair.svg` are from Lucide.
-  Source: https://lucide.dev
-  License: ISC, with the Lucide license text covering included derivatives.
+- `cc0-industrial-tiles.png` is derived from `Industrial TilePack` by tebruno99.
+  Source: https://opengameart.org/content/industrial-tilepack
+  License: CC0 1.0 Universal.
