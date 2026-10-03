@@ -18,7 +18,9 @@ app.innerHTML = `
     <div id="phaser-game" class="game-canvas" aria-label="地雷ちゃんの地下鉄通路"></div>
     <div id="player-layer" class="player-layer" data-facing="right">
       <div class="player-shadow" aria-hidden="true"></div>
-      <div id="player-sprite" class="player-sprite" role="img" aria-label="歩く地雷ちゃん"></div>
+      <div id="player-sprite" class="player-sprite" role="img" aria-label="歩く地雷ちゃん">
+        <div class="player-sprite-frames" aria-hidden="true"></div>
+      </div>
     </div>
     <div class="screen-tools">
       <button id="reset-button" class="screen-button" type="button" title="出発地点へ戻る" aria-label="出発地点へ戻る">↺</button>

@@ -76,12 +76,18 @@ button:focus-visible {
   position: absolute;
   z-index: 1;
   inset: 0;
+  filter: drop-shadow(3px 4px 0 rgba(21, 29, 29, 0.28));
+  transform-origin: 50% 83%;
+}
+
+.player-sprite-frames {
+  position: absolute;
+  inset: 0;
   background-image: url('../assets/zirai-walk-sprite.png');
   background-position: 0 0;
   background-repeat: no-repeat;
   background-size: 1300% 100%;
-  filter: drop-shadow(3px 4px 0 rgba(21, 29, 29, 0.28));
-  transform-origin: 50% 83%;
+  animation: walking-sprite 1.625s steps(12, end) infinite paused;
 }
 
 .player-layer[data-facing='left'] .player-sprite {
@@ -89,13 +95,15 @@ button:focus-visible {
 }
 
 .player-layer.is-walking .player-sprite {
-  animation:
-    player-bob 145ms ease-in-out infinite alternate,
-    walking-sprite 1.625s steps(12, end) infinite;
+  animation: player-bob 145ms ease-in-out infinite alternate;
 }
 
 .player-layer[data-facing='left'].is-walking .player-sprite {
-  animation-name: player-bob-left, walking-sprite;
+  animation-name: player-bob-left;
+}
+
+.player-layer.is-walking .player-sprite-frames {
+  animation-play-state: running;
 }
 
 .screen-tools {
