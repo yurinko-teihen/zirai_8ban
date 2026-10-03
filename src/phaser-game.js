@@ -10,7 +10,6 @@ const START_POSITION = Math.floor(WORLD_SCREENS / 2) * DESIGN_WIDTH + CAMERA_LOC
 const WALK_SPEED = 440
 const LEFT_GATE_POSITION = 150
 const RIGHT_GATE_POSITION = WORLD_WIDTH - LEFT_GATE_POSITION
-const ASSET_BASE = import.meta.env.BASE_URL
 
 const app = document.querySelector('#app')
 
@@ -19,7 +18,7 @@ app.innerHTML = `
     <div id="phaser-game" class="game-canvas" aria-label="地雷ちゃんの地下鉄通路"></div>
     <div id="player-layer" class="player-layer" data-facing="right">
       <div class="player-shadow" aria-hidden="true"></div>
-      <div id="player-sprite" class="player-sprite" role="img" aria-label="歩く地雷ちゃん" style="--walk-sprite: url('${ASSET_BASE}assets/zirai-walk-sprite.png')"></div>
+      <div id="player-sprite" class="player-sprite" role="img" aria-label="歩く地雷ちゃん"></div>
     </div>
     <div class="screen-tools">
       <button id="reset-button" class="screen-button" type="button" title="出発地点へ戻る" aria-label="出発地点へ戻る">↺</button>
