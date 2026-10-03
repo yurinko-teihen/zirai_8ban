@@ -91,7 +91,7 @@ button:focus-visible {
 .player-layer.is-walking .player-sprite {
   animation:
     player-bob 145ms ease-in-out infinite alternate,
-    walking-sprite 1.625s steps(13) infinite;
+    walking-sprite 1.625s steps(12, end) infinite;
 }
 
 .player-layer[data-facing='left'].is-walking .player-sprite {
